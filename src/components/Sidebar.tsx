@@ -67,14 +67,25 @@ export default function Sidebar() {
               </>
             )}
           </NavLink>
-          {[{ id: 'vscode', label: 'VS Code', icon: Code2 }, { id: 'terminal', label: 'Terminal', icon: Terminal }].map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              className="flex items-center gap-2.5 px-3 py-2 rounded-md text-[13px] font-medium text-text-secondary hover:bg-elevated hover:text-text-primary transition-all duration-150 w-full text-left"
+          {[{ to: '/vscode', label: 'VS Code', icon: Code2 }, { to: '/terminal', label: 'Terminal', icon: Terminal }].map(({ to, label, icon: Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) => [
+                'flex items-center gap-2.5 px-3 py-2 rounded-md text-[13px] font-medium transition-all duration-150 w-full text-left',
+                isActive
+                  ? 'bg-primary/15 text-primary'
+                  : 'text-text-secondary hover:bg-elevated hover:text-text-primary',
+              ].join(' ')}
             >
-              <Icon size={15} />
-              {label}
-            </button>
+              {({ isActive }) => (
+                <>
+                  <Icon size={15} className={isActive ? 'text-primary' : ''} />
+                  {label}
+                  {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />}
+                </>
+              )}
+            </NavLink>
           ))}
         </nav>
       </div>

@@ -137,3 +137,46 @@ export async function updateProjectConfig(
   })
   return adaptProject(p)
 }
+
+export async function openInVsCode(opts: { projectId?: string; path?: string }): Promise<{ ok: boolean; path: string }> {
+  return request('/vscode/open', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  })
+}
+
+export interface CommandResult {
+  ok: boolean
+  stdout: string
+  stderr: string
+  exitCode: number
+  id: string
+}
+
+export async function runCommand(opts: {
+  command: string
+  cwd?: string
+  projectId?: string
+}): Promise<CommandResult> {
+  return request('/terminal/run', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  })
+}
+
+export interface CommandHistoryEntry {
+  id: string
+  command: string
+  cwd: string | null
+  projectId: string | null
+  projectName: string | null
+  stdout: string
+  stderr: string
+  exitCode: number
+  executedAt: string
+}
+
+export async function getCommandHistory(projectId?: string): Promise<CommandHistoryEntry[]> {
+  const qs = projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''
+  return request<CommandHistoryEntry[]>(`/terminal/history${qs}`)
+}

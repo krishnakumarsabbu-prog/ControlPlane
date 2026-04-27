@@ -2,10 +2,14 @@
 
 const express = require('express');
 const cors = require('cors');
+const { execFile, spawn } = require('child_process');
+const { promisify } = require('util');
+const execFileAsync = promisify(execFile);
 const projectService = require('./projectService');
 const processService = require('./processService');
 const logService = require('./logService');
 const profileRepo = require('./profileRepository');
+const commandHistoryRepo = require('./commandHistoryRepository');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -277,6 +281,115 @@ app.put('/profiles/:id/projects', (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     logError('PUT /profiles/:id/projects', err);
+    apiError(res, err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /vscode/open — open a path or project in VS Code
+// ---------------------------------------------------------------------------
+app.post('/vscode/open', async (req, res) => {
+  try {
+    const { projectId, path: customPath } = req.body || {};
+    let targetPath = customPath;
+
+    if (projectId) {
+      if (!validateId(projectId)) return res.status(400).json({ error: 'Invalid project id' });
+      const project = projectService.getById(projectId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+      targetPath = project.path;
+    }
+
+    if (!targetPath || typeof targetPath !== 'string') {
+      return res.status(400).json({ error: 'path or projectId is required' });
+    }
+
+    await execFileAsync('code', [targetPath], { timeout: 8000 });
+    res.json({ ok: true, path: targetPath });
+  } catch (err) {
+    logError('POST /vscode/open', err);
+    const msg = err.code === 'ENOENT'
+      ? "VS Code CLI not found. Install it via VS Code: Shell Command: Install 'code' command in PATH."
+      : err.message || String(err);
+    res.status(500).json({ error: msg });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /terminal/run — execute an arbitrary command
+// ---------------------------------------------------------------------------
+app.post('/terminal/run', async (req, res) => {
+  try {
+    const { command, cwd, projectId } = req.body || {};
+    if (!command || typeof command !== 'string' || command.trim().length === 0) {
+      return res.status(400).json({ error: 'command is required' });
+    }
+
+    let workingDir = cwd;
+    let projectName;
+
+    if (projectId) {
+      if (!validateId(projectId)) return res.status(400).json({ error: 'Invalid project id' });
+      const project = projectService.getById(projectId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+      if (!workingDir) workingDir = project.path;
+      projectName = project.name;
+    }
+
+    const options = {
+      shell: true,
+      timeout: 30000,
+      maxBuffer: 1024 * 1024,
+    };
+    if (workingDir) options.cwd = workingDir;
+
+    let stdout = '';
+    let stderr = '';
+    let exitCode = 0;
+
+    try {
+      const result = await execFileAsync(command.split(' ')[0], command.split(' ').slice(1), {
+        ...options,
+        shell: true,
+      });
+      stdout = result.stdout || '';
+      stderr = result.stderr || '';
+    } catch (execErr) {
+      stdout = execErr.stdout || '';
+      stderr = execErr.stderr || execErr.message || '';
+      exitCode = execErr.code ?? 1;
+    }
+
+    const entry = commandHistoryRepo.saveCommand({
+      command: command.trim(),
+      cwd: workingDir || null,
+      projectId: projectId || null,
+      projectName: projectName || null,
+      stdout,
+      stderr,
+      exitCode,
+    });
+
+    res.json({ ok: true, stdout, stderr, exitCode, id: entry.id });
+  } catch (err) {
+    logError('POST /terminal/run', err);
+    apiError(res, err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /terminal/history — get command execution history
+// ---------------------------------------------------------------------------
+app.get('/terminal/history', (req, res) => {
+  try {
+    const projectId = req.query.projectId;
+    if (projectId && !validateId(projectId)) {
+      return res.status(400).json({ error: 'Invalid project id' });
+    }
+    const history = commandHistoryRepo.getHistory(projectId || null, 50);
+    res.json(history);
+  } catch (err) {
+    logError('GET /terminal/history', err);
     apiError(res, err);
   }
 });

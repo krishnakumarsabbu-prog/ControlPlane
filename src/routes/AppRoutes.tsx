@@ -5,6 +5,8 @@ import RunningPage from '../pages/RunningPage'
 import LogsPage from '../pages/LogsPage'
 import PortsPage from '../pages/PortsPage'
 import SettingsPage from '../pages/SettingsPage'
+import VsCodePage from '../pages/VsCodePage'
+import TerminalPage from '../pages/TerminalPage'
 
 export default function AppRoutes() {
   return (
@@ -16,6 +18,8 @@ export default function AppRoutes() {
         <Route path="/logs" element={<LogsPage />} />
         <Route path="/ports" element={<PortsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/vscode" element={<VsCodePage />} />
+        <Route path="/terminal" element={<TerminalPage />} />
       </Route>
     </Routes>
   )

@@ -50,6 +50,18 @@ db.exec(`
     projectId TEXT NOT NULL,
     PRIMARY KEY (profileId, projectId)
   );
+
+  CREATE TABLE IF NOT EXISTS command_history (
+    id          TEXT PRIMARY KEY,
+    command     TEXT NOT NULL,
+    cwd         TEXT,
+    projectId   TEXT,
+    projectName TEXT,
+    stdout      TEXT NOT NULL DEFAULT '',
+    stderr      TEXT NOT NULL DEFAULT '',
+    exitCode    INTEGER NOT NULL DEFAULT 0,
+    executedAt  TEXT NOT NULL
+  );
 `);
 
 module.exports = db;
