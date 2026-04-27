@@ -32,6 +32,7 @@ export function TableRowSkeleton() {
       <td className="px-4 py-3"><Shimmer className="h-5 w-20 rounded-full" /></td>
       <td className="px-4 py-3"><Shimmer className="h-5 w-14 rounded" /></td>
       <td className="px-4 py-3"><Shimmer className="h-3 w-10" /></td>
+      <td className="px-4 py-3"><Shimmer className="h-6 w-16 rounded-md" /></td>
       <td className="px-4 py-3"><Shimmer className="h-3 w-16" /></td>
       <td className="px-4 py-3">
         <div className="flex gap-1.5">

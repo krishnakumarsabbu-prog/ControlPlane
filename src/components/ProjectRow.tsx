@@ -1,4 +1,4 @@
-import { Play, Square, ExternalLink, Loader as Loader2 } from 'lucide-react'
+import { Play, Square, ExternalLink, Loader as Loader2, RefreshCw } from 'lucide-react'
 import StatusPill from './StatusPill'
 import type { Project } from '../types'
 
@@ -6,10 +6,11 @@ interface ProjectRowProps {
   project: Project
   onStart: (id: string) => void
   onStop: (id: string) => void
+  onToggleAutoRestart: (id: string, enabled: boolean) => void
   isPending?: boolean
 }
 
-export default function ProjectRow({ project, onStart, onStop, isPending }: ProjectRowProps) {
+export default function ProjectRow({ project, onStart, onStop, onToggleAutoRestart, isPending }: ProjectRowProps) {
   const isStarting = project.status === 'starting' || isPending
   const canStart = (project.status === 'stopped' || project.status === 'error') && !isPending
   const canStop = project.status === 'running' && !isPending
@@ -32,7 +33,14 @@ export default function ProjectRow({ project, onStart, onStop, isPending }: Proj
 
       {/* Status */}
       <td className="px-4 py-3">
-        <StatusPill status={project.status} />
+        <div className="flex flex-col gap-1">
+          <StatusPill status={project.status} />
+          {project.restartCount > 0 && (
+            <span className="text-[10px] text-warning font-mono">
+              restarted {project.restartCount}x
+            </span>
+          )}
+        </div>
       </td>
 
       {/* Tech */}
@@ -58,6 +66,23 @@ export default function ProjectRow({ project, onStart, onStop, isPending }: Proj
         ) : (
           <span className="text-[12px] text-border">—</span>
         )}
+      </td>
+
+      {/* Auto Restart */}
+      <td className="px-4 py-3">
+        <button
+          onClick={() => onToggleAutoRestart(project.id, !project.autoRestart)}
+          title={project.autoRestart ? `Auto-restart on (max ${project.maxRetries} retries)` : 'Auto-restart off'}
+          className={[
+            'flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-semibold border transition-all duration-150',
+            project.autoRestart
+              ? 'bg-running/10 text-running border-running/25 hover:bg-running/20'
+              : 'bg-border/10 text-text-secondary border-border/20 hover:bg-border/20',
+          ].join(' ')}
+        >
+          <RefreshCw size={10} className={project.autoRestart ? 'animate-spin-slow' : ''} />
+          {project.autoRestart ? `On / ${project.maxRetries}` : 'Off'}
+        </button>
       </td>
 
       {/* Last Run */}

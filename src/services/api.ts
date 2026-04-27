@@ -1,4 +1,4 @@
-import type { Project, LogEntry, SystemStats } from '../types'
+import type { Project, LogEntry, SystemStats, PortRegistry } from '../types'
 
 const BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -22,6 +22,9 @@ interface BackendProject {
   status: string
   port: number | null
   lastRunAt: string | null
+  autoRestart: boolean
+  maxRetries: number
+  restartCount: number
 }
 
 function adaptProject(p: BackendProject): Project {
@@ -35,6 +38,9 @@ function adaptProject(p: BackendProject): Project {
     port: p.port,
     lastRun: p.lastRunAt ? new Date(p.lastRunAt).toLocaleTimeString() : 'never',
     icon: '⬡',
+    autoRestart: p.autoRestart ?? false,
+    maxRetries: p.maxRetries ?? 3,
+    restartCount: p.restartCount ?? 0,
   }
 }
 
@@ -45,6 +51,10 @@ export async function getProjects(): Promise<Project[]> {
 
 export async function getStats(): Promise<SystemStats> {
   return request<SystemStats>('/stats')
+}
+
+export async function getPorts(): Promise<PortRegistry> {
+  return request<PortRegistry>('/ports')
 }
 
 interface LogsResponse {
@@ -79,10 +89,23 @@ export async function createProject(data: {
   path: string
   startCommand: string
   port?: number
+  autoRestart?: boolean
+  maxRetries?: number
 }): Promise<Project> {
   const p = await request<BackendProject>('/projects', {
     method: 'POST',
     body: JSON.stringify(data),
+  })
+  return adaptProject(p)
+}
+
+export async function updateProjectConfig(
+  id: string,
+  config: { autoRestart?: boolean; maxRetries?: number },
+): Promise<Project> {
+  const p = await request<BackendProject>(`/projects/${id}/config`, {
+    method: 'PATCH',
+    body: JSON.stringify(config),
   })
   return adaptProject(p)
 }

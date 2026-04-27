@@ -27,13 +27,17 @@ function getById(id) {
   return _load().find(p => p.id === id) || null;
 }
 
-function create({ name, path: projectPath, startCommand, port }) {
+function create({ name, path: projectPath, startCommand, port, autoRestart = false, maxRetries = 3 }) {
   if (!name || !projectPath || !startCommand) {
     throw new Error('name, path, and startCommand are required');
   }
 
   if (!fs.existsSync(projectPath)) {
     throw new Error(`Path does not exist: ${projectPath}`);
+  }
+
+  if (typeof maxRetries !== 'number' || maxRetries < 0 || maxRetries > 10) {
+    throw new Error('maxRetries must be a number between 0 and 10');
   }
 
   const projects = _load();
@@ -45,10 +49,27 @@ function create({ name, path: projectPath, startCommand, port }) {
     status: 'idle',
     port: port || null,
     lastRunAt: null,
+    autoRestart: Boolean(autoRestart),
+    maxRetries: maxRetries,
   };
   projects.push(project);
   _save(projects);
   return project;
+}
+
+function updateConfig(id, { autoRestart, maxRetries }) {
+  const projects = _load();
+  const idx = projects.findIndex(p => p.id === id);
+  if (idx === -1) throw new Error(`Project not found: ${id}`);
+
+  if (autoRestart !== undefined) projects[idx].autoRestart = Boolean(autoRestart);
+  if (maxRetries !== undefined) {
+    const n = Number(maxRetries);
+    if (isNaN(n) || n < 0 || n > 10) throw new Error('maxRetries must be between 0 and 10');
+    projects[idx].maxRetries = n;
+  }
+  _save(projects);
+  return projects[idx];
 }
 
 function updateStatus(id, status, extra = {}) {
@@ -69,4 +90,4 @@ function remove(id) {
   _save(projects);
 }
 
-module.exports = { getAll, getById, create, updateStatus, remove };
+module.exports = { getAll, getById, create, updateStatus, updateConfig, remove };

@@ -114,3 +114,33 @@ export async function handleClearLogs(): Promise<void> {
   await delay(20)
   _logs = []
 }
+
+export async function handleUpdateProjectConfig(
+  id: string,
+  config: { autoRestart?: boolean; maxRetries?: number },
+): Promise<Project> {
+  await delay(40)
+  const project = _projects.find(p => p.id === id)
+  if (!project) throw new Error(`Project ${id} not found`)
+  _projects = _projects.map(p =>
+    p.id === id
+      ? {
+          ...p,
+          autoRestart: config.autoRestart !== undefined ? config.autoRestart : p.autoRestart,
+          maxRetries: config.maxRetries !== undefined ? config.maxRetries : p.maxRetries,
+        }
+      : p,
+  )
+  return _projects.find(p => p.id === id)!
+}
+
+export async function handleGetPorts(): Promise<Record<number, { projectId: string; projectName: string }>> {
+  await delay(30)
+  const ports: Record<number, { projectId: string; projectName: string }> = {}
+  for (const p of _projects) {
+    if (p.port !== null && p.status === 'running') {
+      ports[p.port] = { projectId: p.id, projectName: p.name }
+    }
+  }
+  return ports
+}

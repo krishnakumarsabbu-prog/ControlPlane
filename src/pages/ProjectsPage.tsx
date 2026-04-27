@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { Boxes, Play, CircleStop as StopCircle, Network } from 'lucide-react'
+import { Boxes, Play, CircleStop as StopCircle, Network, Server, RefreshCw } from 'lucide-react'
 import StatsCard from '../components/StatsCard'
 import ProjectTable from '../components/ProjectTable'
 import LogsPanel from '../components/LogsPanel'
 import { StatsCardSkeleton } from '../components/Skeletons'
-import { useProjects, useStartProject, useStopProject } from '../hooks/useProjects'
+import { useProjects, useStartProject, useStopProject, useUpdateProjectConfig, usePorts } from '../hooks/useProjects'
 import { useLogs, useClearLogs } from '../hooks/useLogs'
 import { useStats } from '../hooks/useStats'
 import type { ToastVariant } from '../components/Toast'
@@ -17,11 +17,13 @@ export default function ProjectsPage({ onToast }: ProjectsPageProps) {
   const [search, setSearch] = useState('')
 
   const { data: projects = [], isLoading: projectsLoading, isError: projectsError } = useProjects()
+  const { data: portRegistry = {} } = usePorts()
   const { entries: logs, clear: clearLogsLocally } = useLogs()
   useStats()
 
   const startMutation = useStartProject()
   const stopMutation = useStopProject()
+  const configMutation = useUpdateProjectConfig()
   const clearLogsMutation = useClearLogs(clearLogsLocally)
 
   const handleStart = (id: string) => {
@@ -46,13 +48,32 @@ export default function ProjectsPage({ onToast }: ProjectsPageProps) {
     })
   }
 
+  const handleToggleAutoRestart = (id: string, enabled: boolean) => {
+    configMutation.mutate(
+      { id, config: { autoRestart: enabled } },
+      {
+        onSuccess: (project) => {
+          onToast(
+            'success',
+            `Auto-restart ${enabled ? 'enabled' : 'disabled'}`,
+            `${project.name} will ${enabled ? 'automatically restart on crash' : 'stay stopped on crash'}`,
+          )
+        },
+        onError: (err) => {
+          onToast('error', 'Failed to update config', (err as Error).message)
+        },
+      },
+    )
+  }
+
   const handleClearLogs = () => {
     clearLogsMutation.mutate()
   }
 
   const runningCount = projects.filter(p => p.status === 'running').length
   const stoppedCount = projects.filter(p => p.status === 'stopped').length
-  const portsUsed = projects.filter(p => p.port !== null).length
+  const portsUsed = Object.keys(portRegistry).length
+  const autoRestartCount = projects.filter(p => p.autoRestart).length
 
   return (
     <main className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-5">
@@ -114,10 +135,44 @@ export default function ProjectsPage({ onToast }: ProjectsPageProps) {
         isLoading={projectsLoading}
         onStart={handleStart}
         onStop={handleStop}
+        onToggleAutoRestart={handleToggleAutoRestart}
         search={search}
         onSearch={setSearch}
         pendingId={startMutation.isPending ? startMutation.variables : stopMutation.variables}
       />
+
+      {/* Port Registry Panel */}
+      {portsUsed > 0 && (
+        <div className="bg-surface border border-border rounded-xl overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+            <Server size={13} className="text-text-secondary" />
+            <span className="text-[12px] font-semibold text-text-primary">Active Ports</span>
+            <span className="ml-auto text-[11px] text-text-secondary">{portsUsed} listener{portsUsed !== 1 ? 's' : ''}</span>
+          </div>
+          <div className="px-4 py-3 flex flex-wrap gap-2">
+            {Object.entries(portRegistry).map(([port, entry]) => (
+              <div
+                key={port}
+                className="flex items-center gap-2 px-3 py-1.5 bg-elevated border border-border rounded-lg text-[11px]"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-running flex-shrink-0" />
+                <span className="font-mono text-text-primary">:{port}</span>
+                <span className="text-text-secondary">{entry.projectName}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Auto-restart summary */}
+      {autoRestartCount > 0 && (
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-running/5 border border-running/15 rounded-xl text-[12px] text-running">
+          <RefreshCw size={12} />
+          <span>
+            <span className="font-semibold">{autoRestartCount}</span> project{autoRestartCount !== 1 ? 's' : ''} configured for auto-restart on crash
+          </span>
+        </div>
+      )}
 
       {/* Logs */}
       <LogsPanel logs={logs} onClear={handleClearLogs} />

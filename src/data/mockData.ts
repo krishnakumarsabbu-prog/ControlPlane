@@ -11,6 +11,9 @@ export const initialProjects: Project[] = [
     port: 3000,
     lastRun: '2 min ago',
     icon: '⚛',
+    autoRestart: true,
+    maxRetries: 3,
+    restartCount: 0,
   },
   {
     id: 'proj-2',
@@ -22,6 +25,9 @@ export const initialProjects: Project[] = [
     port: 8000,
     lastRun: '5 min ago',
     icon: '🐍',
+    autoRestart: false,
+    maxRetries: 3,
+    restartCount: 0,
   },
   {
     id: 'proj-3',
@@ -33,6 +39,9 @@ export const initialProjects: Project[] = [
     port: null,
     lastRun: '1 hour ago',
     icon: '💚',
+    autoRestart: false,
+    maxRetries: 3,
+    restartCount: 0,
   },
   {
     id: 'proj-4',
@@ -44,6 +53,9 @@ export const initialProjects: Project[] = [
     port: null,
     lastRun: '3 hours ago',
     icon: '⬡',
+    autoRestart: false,
+    maxRetries: 3,
+    restartCount: 0,
   },
   {
     id: 'proj-5',
@@ -55,6 +67,9 @@ export const initialProjects: Project[] = [
     port: null,
     lastRun: 'Yesterday',
     icon: '🎸',
+    autoRestart: false,
+    maxRetries: 3,
+    restartCount: 0,
   },
 ]
 

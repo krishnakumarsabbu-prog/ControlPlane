@@ -16,10 +16,14 @@ export default {
         stopped: '#6b7280',
         error: '#ef4444',
         starting: '#f59e0b',
+        warning: '#f59e0b',
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],
+      },
+      animation: {
+        'spin-slow': 'spin 3s linear infinite',
       },
     },
   },

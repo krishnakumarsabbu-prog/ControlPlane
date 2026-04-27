@@ -10,6 +10,9 @@ export interface Project {
   port: number | null
   lastRun: string
   icon: string
+  autoRestart: boolean
+  maxRetries: number
+  restartCount: number
 }
 
 export interface LogEntry {
@@ -27,3 +30,10 @@ export interface SystemStats {
   ram: number
   ramTotal: number
 }
+
+export interface PortEntry {
+  projectId: string
+  projectName: string
+}
+
+export type PortRegistry = Record<number, PortEntry>

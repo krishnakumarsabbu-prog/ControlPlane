@@ -13,6 +13,18 @@ app.use(cors());
 app.use(express.json());
 
 // ---------------------------------------------------------------------------
+// Error helper
+// ---------------------------------------------------------------------------
+function apiError(res, err) {
+  const msg = err.message || String(err);
+  let status = 500;
+  if (/not found/i.test(msg)) status = 404;
+  else if (/already|cannot stop|cannot start/i.test(msg)) status = 409;
+  else if (/required|does not exist|must be/i.test(msg)) status = 400;
+  res.status(status).json({ error: msg });
+}
+
+// ---------------------------------------------------------------------------
 // GET /projects — list all projects, merging live registry status
 // ---------------------------------------------------------------------------
 app.get('/projects', (req, res) => {
@@ -20,13 +32,13 @@ app.get('/projects', (req, res) => {
     const projects = projectService.getAll().map(p => {
       const entry = processService.getRegistryEntry(p.id);
       if (entry) {
-        return { ...p, status: entry.status, port: entry.port ?? p.port };
+        return { ...p, status: entry.status, port: entry.port ?? p.port, restartCount: entry.restartCount ?? 0 };
       }
-      return p;
+      return { ...p, restartCount: 0 };
     });
     res.json(projects);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    apiError(res, err);
   }
 });
 
@@ -35,12 +47,24 @@ app.get('/projects', (req, res) => {
 // ---------------------------------------------------------------------------
 app.post('/projects', (req, res) => {
   try {
-    const { name, path, startCommand, port } = req.body;
-    const project = projectService.create({ name, path, startCommand, port });
+    const { name, path, startCommand, port, autoRestart, maxRetries } = req.body;
+    const project = projectService.create({ name, path, startCommand, port, autoRestart, maxRetries });
     res.status(201).json(project);
   } catch (err) {
-    const status = err.message.includes('does not exist') || err.message.includes('required') ? 400 : 500;
-    res.status(status).json({ error: err.message });
+    apiError(res, err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /projects/:id/config — update autoRestart / maxRetries
+// ---------------------------------------------------------------------------
+app.patch('/projects/:id/config', (req, res) => {
+  try {
+    const { autoRestart, maxRetries } = req.body;
+    const project = projectService.updateConfig(req.params.id, { autoRestart, maxRetries });
+    res.json(project);
+  } catch (err) {
+    apiError(res, err);
   }
 });
 
@@ -52,10 +76,7 @@ app.post('/projects/:id/start', async (req, res) => {
     const project = await processService.start(req.params.id);
     res.json(project);
   } catch (err) {
-    const status = err.message.includes('already') ? 409
-      : err.message.includes('not found') ? 404
-      : 500;
-    res.status(status).json({ error: err.message });
+    apiError(res, err);
   }
 });
 
@@ -67,10 +88,7 @@ app.post('/projects/:id/stop', async (req, res) => {
     const project = await processService.stop(req.params.id);
     res.json(project);
   } catch (err) {
-    const status = err.message.includes('not found') ? 404
-      : err.message.includes('Cannot stop') ? 409
-      : 500;
-    res.status(status).json({ error: err.message });
+    apiError(res, err);
   }
 });
 
@@ -86,7 +104,7 @@ app.get('/projects/:id/logs', (req, res) => {
     const logs = logService.getLogs(req.params.id, since);
     res.json({ logs, seq: logService.getCurrentSeq() });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    apiError(res, err);
   }
 });
 
@@ -98,7 +116,7 @@ app.post('/projects/:id/logs/clear', (req, res) => {
     logService.clearLogs(req.params.id);
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    apiError(res, err);
   }
 });
 
@@ -112,7 +130,7 @@ app.get('/logs', (req, res) => {
     const logs = logService.getAllLogs(since);
     res.json({ logs, seq: logService.getCurrentSeq() });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    apiError(res, err);
   }
 });
 
@@ -124,7 +142,7 @@ app.post('/logs/clear', (req, res) => {
     logService.clearLogs();
     res.json({ ok: true, seq: logService.getCurrentSeq() });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    apiError(res, err);
   }
 });
 
@@ -135,7 +153,18 @@ app.get('/stats', (req, res) => {
   try {
     res.json(processService.getSystemMetrics());
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    apiError(res, err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /ports — active port registry
+// ---------------------------------------------------------------------------
+app.get('/ports', (req, res) => {
+  try {
+    res.json(processService.getPortRegistry());
+  } catch (err) {
+    apiError(res, err);
   }
 });
 

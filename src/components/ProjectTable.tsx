@@ -8,6 +8,7 @@ interface ProjectTableProps {
   isLoading?: boolean
   onStart: (id: string) => void
   onStop: (id: string) => void
+  onToggleAutoRestart: (id: string, enabled: boolean) => void
   search: string
   onSearch: (val: string) => void
   pendingId?: string
@@ -18,6 +19,7 @@ export default function ProjectTable({
   isLoading,
   onStart,
   onStop,
+  onToggleAutoRestart,
   search,
   onSearch,
   pendingId,
@@ -53,7 +55,7 @@ export default function ProjectTable({
         <table className="w-full">
           <thead>
             <tr className="border-b border-border bg-elevated/50 sticky top-0 z-10">
-              {['Project', 'Status', 'Tech', 'Port', 'Last Run', 'Actions'].map(col => (
+              {['Project', 'Status', 'Tech', 'Port', 'Auto Restart', 'Last Run', 'Actions'].map(col => (
                 <th
                   key={col}
                   className="px-4 py-2.5 text-left text-[11px] font-semibold text-text-secondary uppercase tracking-wider"
@@ -68,7 +70,7 @@ export default function ProjectTable({
               Array.from({ length: 5 }).map((_, i) => <TableRowSkeleton key={i} />)
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-[13px] text-text-secondary">
+                <td colSpan={7} className="px-4 py-8 text-center text-[13px] text-text-secondary">
                   No projects match your search.
                 </td>
               </tr>
@@ -79,6 +81,7 @@ export default function ProjectTable({
                   project={project}
                   onStart={onStart}
                   onStop={onStop}
+                  onToggleAutoRestart={onToggleAutoRestart}
                   isPending={pendingId === project.id}
                 />
               ))
