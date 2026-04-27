@@ -1,8 +1,12 @@
-import { Cpu, MemoryStick, Bell } from 'lucide-react'
+import { Cpu, MemoryStick, Bell, Command } from 'lucide-react'
 import { useStats } from '../hooks/useStats'
 import { useProjects } from '../hooks/useProjects'
 
-export default function TopBar() {
+interface TopBarProps {
+  onOpenPalette?: () => void
+}
+
+export default function TopBar({ onOpenPalette }: TopBarProps) {
   const { data: stats } = useStats()
   const { data: projects = [] } = useProjects()
 
@@ -55,6 +59,16 @@ export default function TopBar() {
             {runningCount} running
           </span>
         </div>
+
+        {/* Command palette shortcut */}
+        <button
+          onClick={onOpenPalette}
+          title="Command Palette (Ctrl+K)"
+          className="hidden md:flex items-center gap-2 px-2.5 py-1 bg-elevated border border-border rounded-md text-[11px] text-text-secondary hover:text-text-primary hover:border-border/80 transition-all duration-150"
+        >
+          <Command size={11} />
+          <span>K</span>
+        </button>
 
         {/* Notifications */}
         <button className="relative p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-elevated transition-all duration-150">

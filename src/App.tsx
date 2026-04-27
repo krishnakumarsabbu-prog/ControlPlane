@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from './store/queryClient'
 import Sidebar from './components/Sidebar'
@@ -11,15 +11,32 @@ type NavSection = 'projects' | 'running' | 'logs' | 'ports'
 
 function AppShell() {
   const [activeNav, setActiveNav] = useState<NavSection>('projects')
+  const [paletteOpen, setPaletteOpen] = useState(false)
   const { toasts, push, dismiss } = useToast()
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setPaletteOpen(o => !o)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   return (
     <div className="flex h-screen bg-bg overflow-hidden">
       <Sidebar active={activeNav} onNavigate={setActiveNav} />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <TopBar />
-        <ProjectsPage onToast={push} />
+        <TopBar onOpenPalette={() => setPaletteOpen(true)} />
+        <ProjectsPage
+          onToast={push}
+          onOpenLogs={() => setActiveNav('logs')}
+          paletteOpen={paletteOpen}
+          onPaletteClose={() => setPaletteOpen(false)}
+        />
       </div>
 
       <ToastContainer toasts={toasts} onDismiss={dismiss} />
