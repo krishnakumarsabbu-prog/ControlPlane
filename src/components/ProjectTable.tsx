@@ -101,6 +101,16 @@ export default function ProjectTable({
           <tbody>
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => <TableRowSkeleton key={i} />)
+            ) : projects.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-12 text-center">
+                  <div className="flex flex-col items-center gap-2">
+                    <span className="text-[22px] opacity-30">⬡</span>
+                    <p className="text-[13px] font-medium text-text-secondary">No projects yet</p>
+                    <p className="text-[11px] text-text-secondary opacity-60">Add a POC to get started</p>
+                  </div>
+                </td>
+              </tr>
             ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-4 py-8 text-center text-[13px] text-text-secondary">

@@ -6,20 +6,27 @@ import type { LogEntry } from '../types'
 
 export type LogFilter = 'all' | 'info' | 'warn' | 'error' | 'success' | 'debug' | 'system'
 
+const MAX_LOG_ENTRIES = 500
+const POLL_INTERVAL_MS = 1500
+
 export function useLogs() {
   const [entries, setEntries] = useState<LogEntry[]>([])
   const seqRef = useRef(0)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // track whether the component is mounted to avoid state updates after unmount
+  const mountedRef = useRef(true)
 
   const fetchIncremental = useCallback(async () => {
     try {
       const { logs, seq } = await getLogs(seqRef.current)
+      if (!mountedRef.current) return
       if (logs.length > 0) {
         seqRef.current = seq
         setEntries(prev => {
           const combined = [...prev, ...logs]
-          // Keep at most 1000 in the frontend buffer
-          return combined.length > 1000 ? combined.slice(combined.length - 1000) : combined
+          return combined.length > MAX_LOG_ENTRIES
+            ? combined.slice(combined.length - MAX_LOG_ENTRIES)
+            : combined
         })
       }
     } catch {
@@ -28,9 +35,11 @@ export function useLogs() {
   }, [])
 
   useEffect(() => {
+    mountedRef.current = true
     fetchIncremental()
-    intervalRef.current = setInterval(fetchIncremental, 1000)
+    intervalRef.current = setInterval(fetchIncremental, POLL_INTERVAL_MS)
     return () => {
+      mountedRef.current = false
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
   }, [fetchIncremental])

@@ -17,7 +17,10 @@ export default function ProjectRow({ project, onStart, onStop, onToggleAutoResta
   const canOpen = project.status === 'running' && project.port !== null
 
   return (
-    <tr className="border-b border-border/50 hover:bg-elevated/50 transition-colors duration-150 group">
+    <tr
+      className="border-b border-border/50 hover:bg-elevated/50 transition-colors duration-150 group focus-within:bg-elevated/30"
+      tabIndex={-1}
+    >
       {/* Project */}
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">

@@ -5,6 +5,7 @@ import ProjectTable from '../components/ProjectTable'
 import LogsPanel from '../components/LogsPanel'
 import ProfilesPanel from '../components/ProfilesPanel'
 import CommandPalette from '../components/CommandPalette'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { StatsCardSkeleton } from '../components/Skeletons'
 import { useProjects, useStartProject, useStopProject, useUpdateProjectConfig, usePorts } from '../hooks/useProjects'
 import { useProfiles, useCreateProfile, useDeleteProfile, useUpdateProfileProjects } from '../hooks/useProfiles'
@@ -19,8 +20,15 @@ interface ProjectsPageProps {
   onPaletteClose: () => void
 }
 
+type ConfirmState =
+  | { type: 'stop'; id: string; name: string }
+  | { type: 'stop-all'; count: number }
+  | { type: 'delete-profile'; id: string; name: string }
+  | null
+
 export default function ProjectsPage({ onToast, onOpenLogs, paletteOpen, onPaletteClose }: ProjectsPageProps) {
   const [search, setSearch] = useState('')
+  const [confirm, setConfirm] = useState<ConfirmState>(null)
 
   const { data: projects = [], isLoading: projectsLoading, isError: projectsError } = useProjects()
   const { data: portRegistry = {} } = usePorts()
@@ -36,7 +44,6 @@ export default function ProjectsPage({ onToast, onOpenLogs, paletteOpen, onPalet
   const deleteProfileMutation = useDeleteProfile()
   const updateProfileProjectsMutation = useUpdateProfileProjects()
 
-
   const handleStart = (id: string) => {
     startMutation.mutate(id, {
       onSuccess: (project) => {
@@ -48,7 +55,7 @@ export default function ProjectsPage({ onToast, onOpenLogs, paletteOpen, onPalet
     })
   }
 
-  const handleStop = (id: string) => {
+  const handleStopConfirmed = (id: string) => {
     stopMutation.mutate(id, {
       onSuccess: (project) => {
         onToast('warning', `${project.name} stopped`, 'Process terminated.')
@@ -57,6 +64,12 @@ export default function ProjectsPage({ onToast, onOpenLogs, paletteOpen, onPalet
         onToast('error', 'Failed to stop project', (err as Error).message)
       },
     })
+  }
+
+  const handleStop = (id: string) => {
+    const project = projects.find(p => p.id === id)
+    if (!project) return
+    setConfirm({ type: 'stop', id, name: project.name })
   }
 
   const handleStartAll = () => {
@@ -69,6 +82,11 @@ export default function ProjectsPage({ onToast, onOpenLogs, paletteOpen, onPalet
   const handleStopAll = () => {
     const running = projects.filter(p => p.status === 'running')
     if (running.length === 0) return
+    setConfirm({ type: 'stop-all', count: running.length })
+  }
+
+  const handleStopAllConfirmed = () => {
+    const running = projects.filter(p => p.status === 'running')
     running.forEach(p => stopMutation.mutate(p.id))
     onToast('warning', `Stopping ${running.length} project${running.length !== 1 ? 's' : ''}`, 'All running processes will be terminated.')
   }
@@ -111,10 +129,40 @@ export default function ProjectsPage({ onToast, onOpenLogs, paletteOpen, onPalet
     clearLogsMutation.mutate()
   }
 
+  const handleConfirmCancel = () => setConfirm(null)
+
+  const handleConfirmOk = () => {
+    if (!confirm) return
+    if (confirm.type === 'stop') {
+      handleStopConfirmed(confirm.id)
+    } else if (confirm.type === 'stop-all') {
+      handleStopAllConfirmed()
+    } else if (confirm.type === 'delete-profile') {
+      deleteProfileMutation.mutate(confirm.id, {
+        onSuccess: () => onToast('warning', 'Profile deleted'),
+        onError: (err) => onToast('error', 'Failed to delete profile', (err as Error).message),
+      })
+    }
+    setConfirm(null)
+  }
+
   const runningCount = projects.filter(p => p.status === 'running').length
   const stoppedCount = projects.filter(p => p.status === 'stopped').length
   const portsUsed = Object.keys(portRegistry).length
   const autoRestartCount = projects.filter(p => p.autoRestart).length
+
+  const confirmTitle = !confirm ? ''
+    : confirm.type === 'stop' ? `Stop "${confirm.name}"?`
+    : confirm.type === 'stop-all' ? `Stop all ${confirm.count} running projects?`
+    : `Delete profile "${confirm.name}"?`
+
+  const confirmMessage = !confirm ? ''
+    : confirm.type === 'stop' ? 'The process will be terminated immediately.'
+    : confirm.type === 'stop-all' ? 'All running processes will be terminated immediately.'
+    : 'This will remove the profile and all its project assignments.'
+
+  const confirmLabel = !confirm ? 'Confirm'
+    : confirm.type === 'delete-profile' ? 'Delete' : 'Stop'
 
   return (
     <>
@@ -196,10 +244,8 @@ export default function ProjectsPage({ onToast, onOpenLogs, paletteOpen, onPalet
             })
           }}
           onDeleteProfile={(id) => {
-            deleteProfileMutation.mutate(id, {
-              onSuccess: () => onToast('warning', 'Profile deleted'),
-              onError: (err) => onToast('error', 'Failed to delete profile', (err as Error).message),
-            })
+            const profile = profiles.find(p => p.id === id)
+            setConfirm({ type: 'delete-profile', id, name: profile?.name ?? '' })
           }}
           onUpdateProjectIds={(profileId, projectIds) => {
             updateProfileProjectsMutation.mutate({ profileId, projectIds })
@@ -253,6 +299,17 @@ export default function ProjectsPage({ onToast, onOpenLogs, paletteOpen, onPalet
         onStart={handleStart}
         onStop={handleStop}
         onOpenLogs={onOpenLogs}
+      />
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        open={confirm !== null}
+        title={confirmTitle}
+        message={confirmMessage}
+        confirmLabel={confirmLabel}
+        variant={confirm?.type === 'delete-profile' ? 'danger' : 'warning'}
+        onConfirm={handleConfirmOk}
+        onCancel={handleConfirmCancel}
       />
     </>
   )

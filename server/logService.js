@@ -4,7 +4,8 @@ const { v4: uuidv4 } = require('uuid');
 const logRepo = require('./logRepository');
 const db = require('./db');
 
-const LOG_LIMIT = 500;
+const LOG_LIMIT = 300;
+const GLOBAL_LOG_LIMIT = 2000;
 
 // In-memory seq counter for incremental polling (resets on server restart)
 let _seq = 0;
@@ -73,7 +74,8 @@ function getAllLogs(since = 0) {
     all.push(...entries);
   }
   all.sort((a, b) => a.seq - b.seq);
-  return all;
+  // Cap global response to prevent very large payloads
+  return all.length > GLOBAL_LOG_LIMIT ? all.slice(all.length - GLOBAL_LOG_LIMIT) : all;
 }
 
 function clearLogs(projectId) {

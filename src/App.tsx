@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
 import { ToastContainer } from './components/Toast'
 import ProjectsPage from './pages/ProjectsPage'
+import ErrorBoundary from './components/ErrorBoundary'
 import { useToast } from './hooks/useToast'
 
 type NavSection = 'projects' | 'running' | 'logs' | 'ports'
@@ -31,12 +32,14 @@ function AppShell() {
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <TopBar onOpenPalette={() => setPaletteOpen(true)} />
-        <ProjectsPage
-          onToast={push}
-          onOpenLogs={() => setActiveNav('logs')}
-          paletteOpen={paletteOpen}
-          onPaletteClose={() => setPaletteOpen(false)}
-        />
+        <ErrorBoundary>
+          <ProjectsPage
+            onToast={push}
+            onOpenLogs={() => setActiveNav('logs')}
+            paletteOpen={paletteOpen}
+            onPaletteClose={() => setPaletteOpen(false)}
+          />
+        </ErrorBoundary>
       </div>
 
       <ToastContainer toasts={toasts} onDismiss={dismiss} />
@@ -47,7 +50,9 @@ function AppShell() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AppShell />
+      <ErrorBoundary>
+        <AppShell />
+      </ErrorBoundary>
     </QueryClientProvider>
   )
 }

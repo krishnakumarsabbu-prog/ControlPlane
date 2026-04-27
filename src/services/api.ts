@@ -2,16 +2,44 @@ import type { Project, LogEntry, SystemStats, PortRegistry } from '../types'
 
 const BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...init,
-  })
+const RETRYABLE_STATUSES = new Set([408, 429, 502, 503, 504])
+const MAX_RETRIES = 3
+const RETRY_BASE_MS = 400
+
+async function request<T>(path: string, init?: RequestInit, attempt = 0): Promise<T> {
+  let res: Response
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      headers: { 'Content-Type': 'application/json' },
+      ...init,
+    })
+  } catch (networkErr) {
+    if (attempt < MAX_RETRIES) {
+      await delay(RETRY_BASE_MS * 2 ** attempt)
+      return request<T>(path, init, attempt + 1)
+    }
+    throw new Error('Network error — server may be unreachable')
+  }
+
   if (!res.ok) {
+    if (RETRYABLE_STATUSES.has(res.status) && attempt < MAX_RETRIES && isSafeToRetry(init)) {
+      await delay(RETRY_BASE_MS * 2 ** attempt)
+      return request<T>(path, init, attempt + 1)
+    }
     const body = await res.json().catch(() => ({}))
     throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`)
   }
+
   return res.json() as Promise<T>
+}
+
+function delay(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function isSafeToRetry(init?: RequestInit) {
+  const method = init?.method?.toUpperCase() ?? 'GET'
+  return method === 'GET'
 }
 
 interface BackendProject {

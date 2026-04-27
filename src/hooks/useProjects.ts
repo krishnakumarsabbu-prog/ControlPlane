@@ -5,11 +5,15 @@ import { queryClient } from '../store/queryClient'
 export const PROJECTS_KEY = ['projects'] as const
 export const PORTS_KEY = ['ports'] as const
 
+// Poll projects every 4s — reduced from 3s to ease load
+// Exponential backoff on error is handled by react-query's retry config
 export function useProjects() {
   return useQuery({
     queryKey: PROJECTS_KEY,
     queryFn: getProjects,
-    refetchInterval: 3000,
+    refetchInterval: 4000,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 5000),
   })
 }
 
@@ -17,7 +21,9 @@ export function usePorts() {
   return useQuery({
     queryKey: PORTS_KEY,
     queryFn: getPorts,
-    refetchInterval: 5000,
+    refetchInterval: 6000,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 5000),
   })
 }
 
