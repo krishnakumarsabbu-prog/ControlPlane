@@ -1,43 +1,79 @@
 import type { Project, LogEntry, SystemStats } from '../types'
-import {
-  handleGetProjects,
-  handleGetStats,
-  handleGetLogs,
-  handleStartProject,
-  handleStopProject,
-  handleClearLogs,
-} from './mockServer'
 
-// ---------------------------------------------------------------------------
-// API layer — mirrors REST routes:
-//   GET  /api/projects
-//   POST /api/projects/:id/start
-//   POST /api/projects/:id/stop
-//   GET  /api/projects/:id/logs
-//   GET  /api/stats
-//   POST /api/logs/clear
-// ---------------------------------------------------------------------------
+const BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    headers: { 'Content-Type': 'application/json' },
+    ...init,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`)
+  }
+  return res.json() as Promise<T>
+}
+
+interface BackendProject {
+  id: string
+  name: string
+  path: string
+  startCommand: string
+  status: string
+  port: number | null
+  lastRunAt: string | null
+}
+
+function adaptProject(p: BackendProject): Project {
+  return {
+    id: p.id,
+    name: p.name,
+    path: p.path,
+    status: p.status as Project['status'],
+    tech: 'Node.js',
+    techColor: '#68a063',
+    port: p.port,
+    lastRun: p.lastRunAt ? new Date(p.lastRunAt).toLocaleTimeString() : 'never',
+    icon: '⬡',
+  }
+}
 
 export async function getProjects(): Promise<Project[]> {
-  return handleGetProjects()
+  const list = await request<BackendProject[]>('/projects')
+  return list.map(adaptProject)
 }
 
 export async function getStats(): Promise<SystemStats> {
-  return handleGetStats()
+  return request<SystemStats>('/stats')
 }
 
 export async function getLogs(): Promise<LogEntry[]> {
-  return handleGetLogs()
+  return request<LogEntry[]>('/logs')
 }
 
 export async function startProject(id: string): Promise<Project> {
-  return handleStartProject(id)
+  const p = await request<BackendProject>(`/projects/${id}/start`, { method: 'POST' })
+  return adaptProject(p)
 }
 
 export async function stopProject(id: string): Promise<Project> {
-  return handleStopProject(id)
+  const p = await request<BackendProject>(`/projects/${id}/stop`, { method: 'POST' })
+  return adaptProject(p)
 }
 
 export async function clearLogs(): Promise<void> {
-  return handleClearLogs()
+  await request('/logs/clear', { method: 'POST' })
+}
+
+export async function createProject(data: {
+  name: string
+  path: string
+  startCommand: string
+  port?: number
+}): Promise<Project> {
+  const p = await request<BackendProject>('/projects', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+  return adaptProject(p)
 }
