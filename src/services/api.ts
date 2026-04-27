@@ -47,8 +47,17 @@ export async function getStats(): Promise<SystemStats> {
   return request<SystemStats>('/stats')
 }
 
-export async function getLogs(): Promise<LogEntry[]> {
-  return request<LogEntry[]>('/logs')
+interface LogsResponse {
+  logs: LogEntry[]
+  seq: number
+}
+
+export async function getLogs(since = 0): Promise<LogsResponse> {
+  return request<LogsResponse>(`/logs?since=${since}`)
+}
+
+export async function clearProjectLogs(id: string): Promise<void> {
+  await request(`/projects/${id}/logs/clear`, { method: 'POST' })
 }
 
 export async function startProject(id: string): Promise<Project> {

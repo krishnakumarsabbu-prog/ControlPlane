@@ -77,7 +77,7 @@ async function start(projectId) {
   const { cmd, args } = _parseCommand(project.startCommand);
 
   projectService.updateStatus(projectId, 'starting', { lastRunAt: new Date().toISOString() });
-  logService.push(projectId, project.name, `Starting: ${project.startCommand}`, 'stdout');
+  logService.pushSystem(projectId, project.name, `Starting: ${project.startCommand}`);
 
   let child;
   try {
@@ -146,19 +146,14 @@ async function start(projectId) {
   child.on('error', (err) => {
     entry.status = 'error';
     projectService.updateStatus(projectId, 'error');
-    logService.push(projectId, project.name, `Process error: ${err.message}`, 'stderr');
+    logService.push(projectId, project.name, `Process error: ${err.message}`, 'system');
   });
 
   child.on('close', (code) => {
     const isError = code !== 0 && code !== null;
     entry.status = isError ? 'error' : 'stopped';
     projectService.updateStatus(projectId, entry.status, { port: null });
-    logService.push(
-      projectId,
-      project.name,
-      `Process exited with code ${code}`,
-      isError ? 'stderr' : 'stdout',
-    );
+    logService.pushSystem(projectId, project.name, `Process exited with code ${code}`);
     registry.delete(projectId);
   });
 
@@ -188,7 +183,7 @@ async function stop(projectId) {
     throw new Error(`Cannot stop project in state: ${entry.status}`);
   }
 
-  logService.push(projectId, project.name, `Stopping ${project.name}...`, 'stdout');
+  logService.pushSystem(projectId, project.name, `Stopping ${project.name}...`);
   _killTree(entry.pid);
 
   entry.status = 'stopped';

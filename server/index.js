@@ -76,24 +76,41 @@ app.post('/projects/:id/stop', async (req, res) => {
 
 // ---------------------------------------------------------------------------
 // GET /projects/:id/logs — fetch ring-buffered logs for a project
+//   ?since=<seq>  — return only entries with seq > since (incremental)
 // ---------------------------------------------------------------------------
 app.get('/projects/:id/logs', (req, res) => {
   try {
     const project = projectService.getById(req.params.id);
     if (!project) return res.status(404).json({ error: 'Project not found' });
-    const logs = logService.getLogs(req.params.id);
-    res.json(logs);
+    const since = parseInt(req.query.since, 10) || 0;
+    const logs = logService.getLogs(req.params.id, since);
+    res.json({ logs, seq: logService.getCurrentSeq() });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // ---------------------------------------------------------------------------
-// GET /logs — all logs across all projects (used by frontend global log view)
+// POST /projects/:id/logs/clear — clear logs for a specific project
+// ---------------------------------------------------------------------------
+app.post('/projects/:id/logs/clear', (req, res) => {
+  try {
+    logService.clearLogs(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /logs — all logs across all projects
+//   ?since=<seq>  — incremental fetch
 // ---------------------------------------------------------------------------
 app.get('/logs', (req, res) => {
   try {
-    res.json(logService.getAllLogs());
+    const since = parseInt(req.query.since, 10) || 0;
+    const logs = logService.getAllLogs(since);
+    res.json({ logs, seq: logService.getCurrentSeq() });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -105,7 +122,7 @@ app.get('/logs', (req, res) => {
 app.post('/logs/clear', (req, res) => {
   try {
     logService.clearLogs();
-    res.json({ ok: true });
+    res.json({ ok: true, seq: logService.getCurrentSeq() });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

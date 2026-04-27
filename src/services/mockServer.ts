@@ -9,6 +9,7 @@ let _projects: Project[] = [...initialProjects]
 let _logs: LogEntry[] = [...initialLogs]
 let _stats: SystemStats = { cpu: 24, ram: 4.2, ramTotal: 16 }
 let _logId = 200
+let _logSeq = 100
 
 const PORT_MAP: Record<string, number> = {
   'proj-3': 5173,
@@ -24,8 +25,8 @@ function nowTs() {
   return new Date().toTimeString().slice(0, 8)
 }
 
-function pushLog(entry: Omit<LogEntry, 'id'>) {
-  _logs = [..._logs.slice(-499), { ...entry, id: genId() }]
+function pushLog(entry: Omit<LogEntry, 'id' | 'seq' | 'projectId'> & { projectId?: string }) {
+  _logs = [..._logs.slice(-499), { ...entry, id: genId(), seq: ++_logSeq, projectId: entry.projectId ?? 'mock' }]
 }
 
 setInterval(() => {
@@ -58,9 +59,10 @@ export async function handleGetStats(): Promise<SystemStats> {
   return { ..._stats, cpu: Math.round(_stats.cpu), ram: parseFloat(_stats.ram.toFixed(1)) }
 }
 
-export async function handleGetLogs(): Promise<LogEntry[]> {
+export async function handleGetLogs(since = 0): Promise<{ logs: LogEntry[]; seq: number }> {
   await delay(30)
-  return [..._logs]
+  const logs = since === 0 ? [..._logs] : _logs.filter(e => e.seq > since)
+  return { logs, seq: _logSeq }
 }
 
 export async function handleStartProject(id: string): Promise<Project> {

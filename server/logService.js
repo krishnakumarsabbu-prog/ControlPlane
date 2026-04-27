@@ -7,6 +7,9 @@ const MAX_LOGS = 1000;
 // Map<projectId, LogEntry[]>
 const logBuffers = new Map();
 
+// Global sequence counter for incremental polling
+let _seq = 0;
+
 function _getBuffer(projectId) {
   if (!logBuffers.has(projectId)) {
     logBuffers.set(projectId, []);
@@ -14,8 +17,9 @@ function _getBuffer(projectId) {
   return logBuffers.get(projectId);
 }
 
-function _classifyLevel(text) {
+function _classifyLevel(text, stream) {
   const lower = text.toLowerCase();
+  if (stream === 'system') return 'system';
   if (/\b(error|err|exception|traceback|fatal)\b/.test(lower)) return 'error';
   if (/\b(warn|warning)\b/.test(lower)) return 'warn';
   if (/\b(debug|verbose)\b/.test(lower)) return 'debug';
@@ -31,9 +35,11 @@ function push(projectId, projectName, text, stream = 'stdout') {
   for (const line of lines) {
     const entry = {
       id: uuidv4(),
+      seq: ++_seq,
       timestamp: now.toTimeString().slice(0, 8),
-      level: stream === 'stderr' ? _classifyLevel(line) : _classifyLevel(line),
+      level: _classifyLevel(line, stream),
       project: projectName,
+      projectId,
       message: line,
     };
     buf.push(entry);
@@ -43,16 +49,23 @@ function push(projectId, projectName, text, stream = 'stdout') {
   }
 }
 
-function getLogs(projectId) {
-  return _getBuffer(projectId).slice();
+function pushSystem(projectId, projectName, text) {
+  push(projectId, projectName, text, 'system');
 }
 
-function getAllLogs() {
+function getLogs(projectId, since = 0) {
+  const buf = _getBuffer(projectId);
+  if (since === 0) return buf.slice();
+  return buf.filter(e => e.seq > since);
+}
+
+function getAllLogs(since = 0) {
   const all = [];
   for (const buf of logBuffers.values()) {
-    all.push(...buf);
+    const entries = since === 0 ? buf : buf.filter(e => e.seq > since);
+    all.push(...entries);
   }
-  all.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  all.sort((a, b) => a.seq - b.seq);
   return all;
 }
 
@@ -64,4 +77,8 @@ function clearLogs(projectId) {
   }
 }
 
-module.exports = { push, getLogs, getAllLogs, clearLogs };
+function getCurrentSeq() {
+  return _seq;
+}
+
+module.exports = { push, pushSystem, getLogs, getAllLogs, clearLogs, getCurrentSeq };

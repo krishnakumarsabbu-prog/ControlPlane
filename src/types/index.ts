@@ -14,9 +14,11 @@ export interface Project {
 
 export interface LogEntry {
   id: string
+  seq: number
   timestamp: string
-  level: 'info' | 'warn' | 'error' | 'success' | 'debug'
+  level: 'info' | 'warn' | 'error' | 'success' | 'debug' | 'system'
   project: string
+  projectId: string
   message: string
 }
 

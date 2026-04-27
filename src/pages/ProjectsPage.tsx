@@ -17,12 +17,12 @@ export default function ProjectsPage({ onToast }: ProjectsPageProps) {
   const [search, setSearch] = useState('')
 
   const { data: projects = [], isLoading: projectsLoading, isError: projectsError } = useProjects()
-  const { data: logs = [], isError: logsError } = useLogs()
+  const { entries: logs, clear: clearLogsLocally } = useLogs()
   useStats()
 
   const startMutation = useStartProject()
   const stopMutation = useStopProject()
-  const clearLogsMutation = useClearLogs()
+  const clearLogsMutation = useClearLogs(clearLogsLocally)
 
   const handleStart = (id: string) => {
     startMutation.mutate(id, {
@@ -118,13 +118,6 @@ export default function ProjectsPage({ onToast }: ProjectsPageProps) {
         onSearch={setSearch}
         pendingId={startMutation.isPending ? startMutation.variables : stopMutation.variables}
       />
-
-      {/* Logs error */}
-      {logsError && (
-        <div className="bg-error/10 border border-error/30 rounded-xl px-4 py-3 text-[13px] text-error">
-          Failed to load logs. Retrying automatically...
-        </div>
-      )}
 
       {/* Logs */}
       <LogsPanel logs={logs} onClear={handleClearLogs} />
