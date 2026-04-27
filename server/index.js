@@ -5,6 +5,8 @@ const cors = require('cors');
 const projectService = require('./projectService');
 const processService = require('./processService');
 const logService = require('./logService');
+const profileRepo = require('./profileRepository');
+const profileRepo = require('./profileRepository');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -172,6 +174,106 @@ app.get('/ports', (req, res) => {
 // Health check
 // ---------------------------------------------------------------------------
 app.get('/health', (_req, res) => res.json({ ok: true }));
+// ---------------------------------------------------------------------------
+// GET /profiles — list all profiles with their project assignments
+// ---------------------------------------------------------------------------
+app.get('/profiles', (req, res) => {
+  try {
+    res.json(profileRepo.getAllProfiles());
+  } catch (err) {
+    apiError(res, err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /profiles — create a profile
+// ---------------------------------------------------------------------------
+app.post('/profiles', (req, res) => {
+  try {
+    const { name, color } = req.body;
+    if (!name || !color) return res.status(400).json({ error: 'name and color are required' });
+    res.status(201).json(profileRepo.createProfile(name, color));
+  } catch (err) {
+    apiError(res, err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /profiles/:id — delete a profile
+// ---------------------------------------------------------------------------
+app.delete('/profiles/:id', (req, res) => {
+  try {
+    profileRepo.deleteProfile(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    apiError(res, err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PUT /profiles/:id/projects — replace project assignments for a profile
+// ---------------------------------------------------------------------------
+app.put('/profiles/:id/projects', (req, res) => {
+  try {
+    const { projectIds } = req.body;
+    if (!Array.isArray(projectIds)) return res.status(400).json({ error: 'projectIds must be an array' });
+    profileRepo.updateProfileProjects(req.params.id, projectIds);
+    res.json({ ok: true });
+  } catch (err) {
+    apiError(res, err);
+  }
+});
+
+
+// ---------------------------------------------------------------------------
+// GET /profiles — list all profiles with their project assignments
+// ---------------------------------------------------------------------------
+app.get('/profiles', (req, res) => {
+  try {
+    res.json(profileRepo.getAllProfiles());
+  } catch (err) {
+    apiError(res, err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /profiles — create a profile
+// ---------------------------------------------------------------------------
+app.post('/profiles', (req, res) => {
+  try {
+    const { name, color } = req.body;
+    if (!name || !color) return res.status(400).json({ error: 'name and color are required' });
+    res.status(201).json(profileRepo.createProfile(name, color));
+  } catch (err) {
+    apiError(res, err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /profiles/:id — delete a profile
+// ---------------------------------------------------------------------------
+app.delete('/profiles/:id', (req, res) => {
+  try {
+    profileRepo.deleteProfile(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    apiError(res, err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PUT /profiles/:id/projects — replace project assignments for a profile
+// ---------------------------------------------------------------------------
+app.put('/profiles/:id/projects', (req, res) => {
+  try {
+    const { projectIds } = req.body;
+    if (!Array.isArray(projectIds)) return res.status(400).json({ error: 'projectIds must be an array' });
+    profileRepo.updateProfileProjects(req.params.id, projectIds);
+    res.json({ ok: true });
+  } catch (err) {
+    apiError(res, err);
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Lapi Cloud server listening on http://localhost:${PORT}`);

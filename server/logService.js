@@ -1,20 +1,21 @@
 'use strict';
 
 const { v4: uuidv4 } = require('uuid');
+const logRepo = require('./logRepository');
+const db = require('./db');
 
-const MAX_LOGS = 1000;
+const LOG_LIMIT = 500;
 
-// Map<projectId, LogEntry[]>
-const logBuffers = new Map();
-
-// Global sequence counter for incremental polling
+// In-memory seq counter for incremental polling (resets on server restart)
 let _seq = 0;
 
+// In-memory buffer used for incremental since-based polling
+// Map<projectId, LogEntry[]>
+const _buffers = new Map();
+
 function _getBuffer(projectId) {
-  if (!logBuffers.has(projectId)) {
-    logBuffers.set(projectId, []);
-  }
-  return logBuffers.get(projectId);
+  if (!_buffers.has(projectId)) _buffers.set(projectId, []);
+  return _buffers.get(projectId);
 }
 
 function _classifyLevel(text, stream) {
@@ -28,23 +29,29 @@ function _classifyLevel(text, stream) {
 }
 
 function push(projectId, projectName, text, stream = 'stdout') {
-  const buf = _getBuffer(projectId);
   const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
   const now = new Date();
 
   for (const line of lines) {
+    const level = _classifyLevel(line, stream);
     const entry = {
       id: uuidv4(),
       seq: ++_seq,
       timestamp: now.toTimeString().slice(0, 8),
-      level: _classifyLevel(line, stream),
+      level,
       project: projectName,
       projectId,
       message: line,
     };
+
+    const buf = _getBuffer(projectId);
     buf.push(entry);
-    if (buf.length > MAX_LOGS) {
-      buf.splice(0, buf.length - MAX_LOGS);
+    if (buf.length > LOG_LIMIT) buf.splice(0, buf.length - LOG_LIMIT);
+
+    try {
+      logRepo.addLog(projectId, line, level.toUpperCase());
+    } catch (_) {
+      // non-fatal — don't crash process on log write failure
     }
   }
 }
@@ -61,7 +68,7 @@ function getLogs(projectId, since = 0) {
 
 function getAllLogs(since = 0) {
   const all = [];
-  for (const buf of logBuffers.values()) {
+  for (const buf of _buffers.values()) {
     const entries = since === 0 ? buf : buf.filter(e => e.seq > since);
     all.push(...entries);
   }
@@ -70,10 +77,14 @@ function getAllLogs(since = 0) {
 }
 
 function clearLogs(projectId) {
+  try {
+    logRepo.clearLogs(projectId);
+  } catch (_) {}
+
   if (projectId) {
-    logBuffers.set(projectId, []);
+    _buffers.set(projectId, []);
   } else {
-    logBuffers.clear();
+    _buffers.clear();
   }
 }
 

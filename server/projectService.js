@@ -1,30 +1,23 @@
 'use strict';
 
 const fs = require('fs');
-const path = require('path');
 const { v4: uuidv4 } = require('uuid');
-
-const DATA_FILE = path.join(__dirname, 'projects.json');
-
-function _load() {
-  try {
-    if (fs.existsSync(DATA_FILE)) {
-      return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    }
-  } catch (_) {}
-  return [];
-}
-
-function _save(projects) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(projects, null, 2), 'utf8');
-}
+const repo = require('./projectRepository');
 
 function getAll() {
-  return _load();
+  try {
+    return repo.getAllProjects();
+  } catch (err) {
+    throw new Error(`getAll: ${err.message}`);
+  }
 }
 
 function getById(id) {
-  return _load().find(p => p.id === id) || null;
+  try {
+    return repo.getProjectById(id);
+  } catch (err) {
+    throw new Error(`getById: ${err.message}`);
+  }
 }
 
 function create({ name, path: projectPath, startCommand, port, autoRestart = false, maxRetries = 3 }) {
@@ -40,54 +33,57 @@ function create({ name, path: projectPath, startCommand, port, autoRestart = fal
     throw new Error('maxRetries must be a number between 0 and 10');
   }
 
-  const projects = _load();
-  const project = {
-    id: uuidv4(),
-    name,
-    path: projectPath,
-    startCommand,
-    status: 'idle',
-    port: port || null,
-    lastRunAt: null,
-    autoRestart: Boolean(autoRestart),
-    maxRetries: maxRetries,
-  };
-  projects.push(project);
-  _save(projects);
-  return project;
+  try {
+    return repo.createProject({
+      id: uuidv4(),
+      name,
+      path: projectPath,
+      startCommand,
+      status: 'idle',
+      port: port || null,
+      lastRunAt: null,
+      autoRestart: Boolean(autoRestart),
+      maxRetries,
+      createdAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    throw new Error(`create: ${err.message}`);
+  }
 }
 
 function updateConfig(id, { autoRestart, maxRetries }) {
-  const projects = _load();
-  const idx = projects.findIndex(p => p.id === id);
-  if (idx === -1) throw new Error(`Project not found: ${id}`);
+  const project = repo.getProjectById(id);
+  if (!project) throw new Error(`Project not found: ${id}`);
 
-  if (autoRestart !== undefined) projects[idx].autoRestart = Boolean(autoRestart);
+  const data = {};
+  if (autoRestart !== undefined) data.autoRestart = Boolean(autoRestart);
   if (maxRetries !== undefined) {
     const n = Number(maxRetries);
     if (isNaN(n) || n < 0 || n > 10) throw new Error('maxRetries must be between 0 and 10');
-    projects[idx].maxRetries = n;
+    data.maxRetries = n;
   }
-  _save(projects);
-  return projects[idx];
+
+  try {
+    return repo.updateProject(id, data);
+  } catch (err) {
+    throw new Error(`updateConfig: ${err.message}`);
+  }
 }
 
 function updateStatus(id, status, extra = {}) {
-  const projects = _load();
-  const idx = projects.findIndex(p => p.id === id);
-  if (idx === -1) throw new Error(`Project not found: ${id}`);
-
-  projects[idx] = { ...projects[idx], status, ...extra };
-  _save(projects);
-  return projects[idx];
+  try {
+    return repo.updateProject(id, { status, ...extra });
+  } catch (err) {
+    throw new Error(`updateStatus: ${err.message}`);
+  }
 }
 
 function remove(id) {
-  const projects = _load();
-  const idx = projects.findIndex(p => p.id === id);
-  if (idx === -1) throw new Error(`Project not found: ${id}`);
-  projects.splice(idx, 1);
-  _save(projects);
+  try {
+    repo.deleteProject(id);
+  } catch (err) {
+    throw new Error(`remove: ${err.message}`);
+  }
 }
 
 module.exports = { getAll, getById, create, updateStatus, updateConfig, remove };
