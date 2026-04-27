@@ -1,16 +1,27 @@
 import { Search, Plus } from 'lucide-react'
 import ProjectRow from './ProjectRow'
+import { TableRowSkeleton } from './Skeletons'
 import type { Project } from '../types'
 
 interface ProjectTableProps {
   projects: Project[]
+  isLoading?: boolean
   onStart: (id: string) => void
   onStop: (id: string) => void
   search: string
   onSearch: (val: string) => void
+  pendingId?: string
 }
 
-export default function ProjectTable({ projects, onStart, onStop, search, onSearch }: ProjectTableProps) {
+export default function ProjectTable({
+  projects,
+  isLoading,
+  onStart,
+  onStop,
+  search,
+  onSearch,
+  pendingId,
+}: ProjectTableProps) {
   const filtered = projects.filter(
     p =>
       p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -53,7 +64,9 @@ export default function ProjectTable({ projects, onStart, onStop, search, onSear
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {isLoading ? (
+              Array.from({ length: 5 }).map((_, i) => <TableRowSkeleton key={i} />)
+            ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-[13px] text-text-secondary">
                   No projects match your search.
@@ -66,6 +79,7 @@ export default function ProjectTable({ projects, onStart, onStop, search, onSear
                   project={project}
                   onStart={onStart}
                   onStop={onStop}
+                  isPending={pendingId === project.id}
                 />
               ))
             )}
@@ -75,7 +89,11 @@ export default function ProjectTable({ projects, onStart, onStop, search, onSear
 
       {/* Footer */}
       <div className="px-4 py-2.5 border-t border-border text-[11px] text-text-secondary">
-        {filtered.length} of {projects.length} projects
+        {isLoading ? (
+          <span className="opacity-50">Loading...</span>
+        ) : (
+          `${filtered.length} of ${projects.length} projects`
+        )}
       </div>
     </div>
   )

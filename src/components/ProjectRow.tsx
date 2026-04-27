@@ -6,12 +6,13 @@ interface ProjectRowProps {
   project: Project
   onStart: (id: string) => void
   onStop: (id: string) => void
+  isPending?: boolean
 }
 
-export default function ProjectRow({ project, onStart, onStop }: ProjectRowProps) {
-  const canStart = project.status === 'stopped' || project.status === 'error'
-  const canStop = project.status === 'running'
-  const isStarting = project.status === 'starting'
+export default function ProjectRow({ project, onStart, onStop, isPending }: ProjectRowProps) {
+  const isStarting = project.status === 'starting' || isPending
+  const canStart = (project.status === 'stopped' || project.status === 'error') && !isPending
+  const canStop = project.status === 'running' && !isPending
   const canOpen = project.status === 'running' && project.port !== null
 
   return (
@@ -70,11 +71,11 @@ export default function ProjectRow({ project, onStart, onStop }: ProjectRowProps
           {/* Start */}
           <button
             onClick={() => onStart(project.id)}
-            disabled={!canStart || isStarting}
+            disabled={!canStart}
             title="Start"
             className={[
               'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all duration-150',
-              canStart && !isStarting
+              canStart
                 ? 'bg-running/10 text-running border border-running/20 hover:bg-running/20 hover:border-running/40 cursor-pointer'
                 : 'bg-border/20 text-border border border-transparent cursor-not-allowed opacity-40',
             ].join(' ')}
