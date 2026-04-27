@@ -11,6 +11,7 @@ interface ProjectTableProps {
   onToggleAutoRestart: (id: string, enabled: boolean) => void
   onStartAll: () => void
   onStopAll: () => void
+  onAddProject?: () => void
   search: string
   onSearch: (val: string) => void
   pendingId?: string
@@ -24,6 +25,7 @@ export default function ProjectTable({
   onToggleAutoRestart,
   onStartAll,
   onStopAll,
+  onAddProject,
   search,
   onSearch,
   pendingId,
@@ -76,7 +78,10 @@ export default function ProjectTable({
         </div>
 
         <div className="ml-auto">
-          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary/80 text-white text-[12px] font-semibold rounded-md transition-all duration-150 active:scale-95">
+          <button
+            onClick={onAddProject}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary/80 text-white text-[12px] font-semibold rounded-md transition-all duration-150 active:scale-95"
+          >
             <Plus size={13} />
             Add POC
           </button>

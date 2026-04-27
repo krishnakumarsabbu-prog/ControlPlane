@@ -1,16 +1,30 @@
-import { Cpu, MemoryStick, Bell, Command } from 'lucide-react'
+import { useLocation } from 'react-router-dom'
+import { Cpu, MemoryStick, Bell, Command, RefreshCw } from 'lucide-react'
 import { useStats } from '../hooks/useStats'
 import { useProjects } from '../hooks/useProjects'
+import { queryClient } from '../store/queryClient'
+
+const ROUTE_LABELS: Record<string, string> = {
+  '/projects': 'Projects',
+  '/running': 'Running',
+  '/logs': 'Logs',
+  '/ports': 'Ports',
+  '/settings': 'Settings',
+}
 
 interface TopBarProps {
   onOpenPalette?: () => void
+  paletteOpen?: boolean
+  onPaletteClose?: () => void
 }
 
 export default function TopBar({ onOpenPalette }: TopBarProps) {
   const { data: stats } = useStats()
   const { data: projects = [] } = useProjects()
+  const location = useLocation()
 
   const runningCount = projects.filter(p => p.status === 'running').length
+  const pageLabel = ROUTE_LABELS[location.pathname] ?? 'Dashboard'
 
   const cpu = stats ? Math.round(stats.cpu) : 0
   const cpuColor = cpu > 80 ? 'text-error' : cpu > 60 ? 'text-starting' : 'text-running'
@@ -18,13 +32,17 @@ export default function TopBar({ onOpenPalette }: TopBarProps) {
   const ramPct = stats ? Math.round((stats.ram / stats.ramTotal) * 100) : 0
   const ramColor = ramPct > 80 ? 'text-error' : ramPct > 60 ? 'text-starting' : 'text-running'
 
+  const handleRefresh = () => {
+    queryClient.invalidateQueries()
+  }
+
   return (
     <header className="flex items-center justify-between px-6 py-3 border-b border-border bg-sidebar/80 backdrop-blur-sm sticky top-0 z-10">
       {/* Left: breadcrumb */}
       <div className="flex items-center gap-2 text-[13px]">
         <span className="text-text-secondary">Control Plane</span>
         <span className="text-border">/</span>
-        <span className="text-text-primary font-medium">Projects</span>
+        <span className="text-text-primary font-medium">{pageLabel}</span>
       </div>
 
       {/* Right: stats + avatar */}
@@ -59,6 +77,15 @@ export default function TopBar({ onOpenPalette }: TopBarProps) {
             {runningCount} running
           </span>
         </div>
+
+        {/* Refresh */}
+        <button
+          onClick={handleRefresh}
+          title="Refresh all data"
+          className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-elevated transition-all duration-150"
+        >
+          <RefreshCw size={14} />
+        </button>
 
         {/* Command palette shortcut */}
         <button

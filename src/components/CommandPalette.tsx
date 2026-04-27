@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Search, Play, Square, ScrollText, ExternalLink, Layers } from 'lucide-react'
 import type { Project } from '../types'
 
@@ -8,7 +9,7 @@ interface CommandPaletteProps {
   projects: Project[]
   onStart: (id: string) => void
   onStop: (id: string) => void
-  onOpenLogs: () => void
+  onOpenLogs?: () => void
 }
 
 interface CommandItem {
@@ -26,8 +27,8 @@ export default function CommandPalette({
   projects,
   onStart,
   onStop,
-  onOpenLogs,
 }: CommandPaletteProps) {
+  const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -69,7 +70,7 @@ export default function CommandPalette({
       label: 'Open Logs',
       sublabel: 'View all project logs',
       icon: <ScrollText size={13} className="text-text-secondary" />,
-      action: () => { onOpenLogs(); onClose() },
+      action: () => { navigate('/logs'); onClose() },
       group: 'Navigation',
     },
   ]

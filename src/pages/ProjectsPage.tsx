@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { Boxes, Play, CircleStop as StopCircle, Network, Server, RefreshCw } from 'lucide-react'
 import StatsCard from '../components/StatsCard'
 import ProjectTable from '../components/ProjectTable'
@@ -6,19 +7,22 @@ import LogsPanel from '../components/LogsPanel'
 import ProfilesPanel from '../components/ProfilesPanel'
 import CommandPalette from '../components/CommandPalette'
 import ConfirmDialog from '../components/ConfirmDialog'
+import AddProjectModal from '../components/AddProjectModal'
 import { StatsCardSkeleton } from '../components/Skeletons'
-import { useProjects, useStartProject, useStopProject, useUpdateProjectConfig, usePorts } from '../hooks/useProjects'
+import {
+  useProjects,
+  useStartProject,
+  useStopProject,
+  useUpdateProjectConfig,
+  usePorts,
+  useCreateProject,
+} from '../hooks/useProjects'
 import { useProfiles, useCreateProfile, useDeleteProfile, useUpdateProfileProjects } from '../hooks/useProfiles'
 import { useLogs, useClearLogs } from '../hooks/useLogs'
 import { useStats } from '../hooks/useStats'
-import type { ToastVariant } from '../components/Toast'
+import { useToastPush } from '../context/ToastContext'
 
-interface ProjectsPageProps {
-  onToast: (variant: ToastVariant, title: string, body?: string) => void
-  onOpenLogs: () => void
-  paletteOpen: boolean
-  onPaletteClose: () => void
-}
+type OutletCtx = { paletteOpen: boolean; onPaletteClose: () => void }
 
 type ConfirmState =
   | { type: 'stop'; id: string; name: string }
@@ -26,9 +30,13 @@ type ConfirmState =
   | { type: 'delete-profile'; id: string; name: string }
   | null
 
-export default function ProjectsPage({ onToast, onOpenLogs, paletteOpen, onPaletteClose }: ProjectsPageProps) {
+export default function ProjectsPage() {
+  const { paletteOpen, onPaletteClose } = useOutletContext<OutletCtx>()
+  const push = useToastPush()
+
   const [search, setSearch] = useState('')
   const [confirm, setConfirm] = useState<ConfirmState>(null)
+  const [addModalOpen, setAddModalOpen] = useState(false)
 
   const { data: projects = [], isLoading: projectsLoading, isError: projectsError } = useProjects()
   const { data: portRegistry = {} } = usePorts()
@@ -40,29 +48,22 @@ export default function ProjectsPage({ onToast, onOpenLogs, paletteOpen, onPalet
   const stopMutation = useStopProject()
   const configMutation = useUpdateProjectConfig()
   const clearLogsMutation = useClearLogs(clearLogsLocally)
+  const createMutation = useCreateProject()
   const createProfileMutation = useCreateProfile()
   const deleteProfileMutation = useDeleteProfile()
   const updateProfileProjectsMutation = useUpdateProfileProjects()
 
   const handleStart = (id: string) => {
     startMutation.mutate(id, {
-      onSuccess: (project) => {
-        onToast('success', `Starting ${project.name}`, 'Project is initializing...')
-      },
-      onError: (err) => {
-        onToast('error', 'Failed to start project', (err as Error).message)
-      },
+      onSuccess: (project) => push('success', `Starting ${project.name}`, 'Project is initializing...'),
+      onError: (err) => push('error', 'Failed to start project', (err as Error).message),
     })
   }
 
   const handleStopConfirmed = (id: string) => {
     stopMutation.mutate(id, {
-      onSuccess: (project) => {
-        onToast('warning', `${project.name} stopped`, 'Process terminated.')
-      },
-      onError: (err) => {
-        onToast('error', 'Failed to stop project', (err as Error).message)
-      },
+      onSuccess: (project) => push('warning', `${project.name} stopped`, 'Process terminated.'),
+      onError: (err) => push('error', 'Failed to stop project', (err as Error).message),
     })
   }
 
@@ -76,7 +77,7 @@ export default function ProjectsPage({ onToast, onOpenLogs, paletteOpen, onPalet
     const stoppable = projects.filter(p => p.status !== 'running' && p.status !== 'starting')
     if (stoppable.length === 0) return
     stoppable.forEach(p => startMutation.mutate(p.id))
-    onToast('success', `Starting ${stoppable.length} project${stoppable.length !== 1 ? 's' : ''}`, 'All stopped projects are initializing...')
+    push('success', `Starting ${stoppable.length} project${stoppable.length !== 1 ? 's' : ''}`, 'All stopped projects are initializing...')
   }
 
   const handleStopAll = () => {
@@ -88,48 +89,40 @@ export default function ProjectsPage({ onToast, onOpenLogs, paletteOpen, onPalet
   const handleStopAllConfirmed = () => {
     const running = projects.filter(p => p.status === 'running')
     running.forEach(p => stopMutation.mutate(p.id))
-    onToast('warning', `Stopping ${running.length} project${running.length !== 1 ? 's' : ''}`, 'All running processes will be terminated.')
+    push('warning', `Stopping ${running.length} project${running.length !== 1 ? 's' : ''}`, 'All running processes will be terminated.')
   }
 
   const handleStartGroup = (projectIds: string[]) => {
     const targets = projects.filter(p => projectIds.includes(p.id) && p.status !== 'running' && p.status !== 'starting')
     targets.forEach(p => startMutation.mutate(p.id))
-    if (targets.length > 0) {
-      onToast('success', `Starting ${targets.length} project${targets.length !== 1 ? 's' : ''}`, 'Profile projects are initializing...')
-    }
+    if (targets.length > 0) push('success', `Starting ${targets.length} project${targets.length !== 1 ? 's' : ''}`, 'Profile projects are initializing...')
   }
 
   const handleStopGroup = (projectIds: string[]) => {
     const targets = projects.filter(p => projectIds.includes(p.id) && p.status === 'running')
     targets.forEach(p => stopMutation.mutate(p.id))
-    if (targets.length > 0) {
-      onToast('warning', `Stopping ${targets.length} project${targets.length !== 1 ? 's' : ''}`, 'Profile projects will be terminated.')
-    }
+    if (targets.length > 0) push('warning', `Stopping ${targets.length} project${targets.length !== 1 ? 's' : ''}`, 'Profile projects will be terminated.')
   }
 
   const handleToggleAutoRestart = (id: string, enabled: boolean) => {
     configMutation.mutate(
       { id, config: { autoRestart: enabled } },
       {
-        onSuccess: (project) => {
-          onToast(
-            'success',
-            `Auto-restart ${enabled ? 'enabled' : 'disabled'}`,
-            `${project.name} will ${enabled ? 'automatically restart on crash' : 'stay stopped on crash'}`,
-          )
-        },
-        onError: (err) => {
-          onToast('error', 'Failed to update config', (err as Error).message)
-        },
+        onSuccess: (project) => push('success', `Auto-restart ${enabled ? 'enabled' : 'disabled'}`, `${project.name} will ${enabled ? 'automatically restart on crash' : 'stay stopped on crash'}`),
+        onError: (err) => push('error', 'Failed to update config', (err as Error).message),
       },
     )
   }
 
-  const handleClearLogs = () => {
-    clearLogsMutation.mutate()
+  const handleAddProject = (data: { name: string; path: string; startCommand: string }) => {
+    createMutation.mutate(data, {
+      onSuccess: (project) => {
+        push('success', `Added ${project.name}`, 'Project registered successfully.')
+        setAddModalOpen(false)
+      },
+      onError: (err) => push('error', 'Failed to add project', (err as Error).message),
+    })
   }
-
-  const handleConfirmCancel = () => setConfirm(null)
 
   const handleConfirmOk = () => {
     if (!confirm) return
@@ -139,8 +132,8 @@ export default function ProjectsPage({ onToast, onOpenLogs, paletteOpen, onPalet
       handleStopAllConfirmed()
     } else if (confirm.type === 'delete-profile') {
       deleteProfileMutation.mutate(confirm.id, {
-        onSuccess: () => onToast('warning', 'Profile deleted'),
-        onError: (err) => onToast('error', 'Failed to delete profile', (err as Error).message),
+        onSuccess: () => push('warning', 'Profile deleted'),
+        onError: (err) => push('error', 'Failed to delete profile', (err as Error).message),
       })
     }
     setConfirm(null)
@@ -170,56 +163,23 @@ export default function ProjectsPage({ onToast, onOpenLogs, paletteOpen, onPalet
         {/* Stats */}
         {projectsLoading ? (
           <div className="grid grid-cols-4 gap-4">
-            <StatsCardSkeleton />
-            <StatsCardSkeleton />
-            <StatsCardSkeleton />
-            <StatsCardSkeleton />
+            <StatsCardSkeleton /><StatsCardSkeleton /><StatsCardSkeleton /><StatsCardSkeleton />
           </div>
         ) : (
           <div className="grid grid-cols-4 gap-4">
-            <StatsCard
-              label="Total POCs"
-              value={projects.length}
-              icon={Boxes}
-              color="text-primary"
-              bgColor="bg-primary/10"
-              delta="All environments"
-            />
-            <StatsCard
-              label="Running"
-              value={runningCount}
-              icon={Play}
-              color="text-running"
-              bgColor="bg-running/10"
-              delta={runningCount > 0 ? 'Active' : 'None active'}
-            />
-            <StatsCard
-              label="Stopped"
-              value={stoppedCount}
-              icon={StopCircle}
-              color="text-stopped"
-              bgColor="bg-stopped/10"
-              delta="Idle processes"
-            />
-            <StatsCard
-              label="Ports Used"
-              value={portsUsed}
-              icon={Network}
-              color="text-starting"
-              bgColor="bg-starting/10"
-              delta="Active listeners"
-            />
+            <StatsCard label="Total POCs" value={projects.length} icon={Boxes} color="text-primary" bgColor="bg-primary/10" delta="All environments" />
+            <StatsCard label="Running" value={runningCount} icon={Play} color="text-running" bgColor="bg-running/10" delta={runningCount > 0 ? 'Active' : 'None active'} />
+            <StatsCard label="Stopped" value={stoppedCount} icon={StopCircle} color="text-stopped" bgColor="bg-stopped/10" delta="Idle processes" />
+            <StatsCard label="Ports Used" value={portsUsed} icon={Network} color="text-starting" bgColor="bg-starting/10" delta="Active listeners" />
           </div>
         )}
 
-        {/* Error banner */}
         {projectsError && (
           <div className="bg-error/10 border border-error/30 rounded-xl px-4 py-3 text-[13px] text-error">
             Failed to load projects. Retrying automatically...
           </div>
         )}
 
-        {/* Table */}
         <ProjectTable
           projects={projects}
           isLoading={projectsLoading}
@@ -228,33 +188,30 @@ export default function ProjectsPage({ onToast, onOpenLogs, paletteOpen, onPalet
           onToggleAutoRestart={handleToggleAutoRestart}
           onStartAll={handleStartAll}
           onStopAll={handleStopAll}
+          onAddProject={() => setAddModalOpen(true)}
           search={search}
           onSearch={setSearch}
           pendingId={startMutation.isPending ? startMutation.variables : stopMutation.variables}
         />
 
-        {/* Profiles */}
         <ProfilesPanel
           profiles={profiles}
           projects={projects}
           onCreateProfile={(name, color) => {
             createProfileMutation.mutate({ name, color }, {
-              onSuccess: () => onToast('success', 'Profile created'),
-              onError: (err) => onToast('error', 'Failed to create profile', (err as Error).message),
+              onSuccess: () => push('success', 'Profile created'),
+              onError: (err) => push('error', 'Failed to create profile', (err as Error).message),
             })
           }}
           onDeleteProfile={(id) => {
             const profile = profiles.find(p => p.id === id)
             setConfirm({ type: 'delete-profile', id, name: profile?.name ?? '' })
           }}
-          onUpdateProjectIds={(profileId, projectIds) => {
-            updateProfileProjectsMutation.mutate({ profileId, projectIds })
-          }}
+          onUpdateProjectIds={(profileId, projectIds) => updateProfileProjectsMutation.mutate({ profileId, projectIds })}
           onStartGroup={handleStartGroup}
           onStopGroup={handleStopGroup}
         />
 
-        {/* Port Registry Panel */}
         {portsUsed > 0 && (
           <div className="bg-surface border border-border rounded-xl overflow-hidden">
             <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
@@ -264,10 +221,7 @@ export default function ProjectsPage({ onToast, onOpenLogs, paletteOpen, onPalet
             </div>
             <div className="px-4 py-3 flex flex-wrap gap-2">
               {Object.entries(portRegistry).map(([port, entry]) => (
-                <div
-                  key={port}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-elevated border border-border rounded-lg text-[11px]"
-                >
+                <div key={port} className="flex items-center gap-2 px-3 py-1.5 bg-elevated border border-border rounded-lg text-[11px]">
                   <span className="w-1.5 h-1.5 rounded-full bg-running flex-shrink-0" />
                   <span className="font-mono text-text-primary">:{port}</span>
                   <span className="text-text-secondary">{entry.projectName}</span>
@@ -277,7 +231,6 @@ export default function ProjectsPage({ onToast, onOpenLogs, paletteOpen, onPalet
           </div>
         )}
 
-        {/* Auto-restart summary */}
         {autoRestartCount > 0 && (
           <div className="flex items-center gap-2 px-4 py-2.5 bg-running/5 border border-running/15 rounded-xl text-[12px] text-running">
             <RefreshCw size={12} />
@@ -287,21 +240,24 @@ export default function ProjectsPage({ onToast, onOpenLogs, paletteOpen, onPalet
           </div>
         )}
 
-        {/* Logs */}
-        <LogsPanel logs={logs} onClear={handleClearLogs} />
+        <LogsPanel logs={logs} onClear={() => clearLogsMutation.mutate()} />
       </main>
 
-      {/* Command Palette */}
+      <AddProjectModal
+        open={addModalOpen}
+        onClose={() => setAddModalOpen(false)}
+        onSubmit={handleAddProject}
+        isSubmitting={createMutation.isPending}
+      />
+
       <CommandPalette
         open={paletteOpen}
         onClose={onPaletteClose}
         projects={projects}
         onStart={handleStart}
         onStop={handleStop}
-        onOpenLogs={onOpenLogs}
       />
 
-      {/* Confirm Dialog */}
       <ConfirmDialog
         open={confirm !== null}
         title={confirmTitle}
@@ -309,7 +265,7 @@ export default function ProjectsPage({ onToast, onOpenLogs, paletteOpen, onPalet
         confirmLabel={confirmLabel}
         variant={confirm?.type === 'delete-profile' ? 'danger' : 'warning'}
         onConfirm={handleConfirmOk}
-        onCancel={handleConfirmCancel}
+        onCancel={() => setConfirm(null)}
       />
     </>
   )

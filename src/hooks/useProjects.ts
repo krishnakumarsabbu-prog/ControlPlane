@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { getProjects, startProject, stopProject, updateProjectConfig, getPorts } from '../services/api'
+import { getProjects, startProject, stopProject, updateProjectConfig, getPorts, createProject } from '../services/api'
 import { queryClient } from '../store/queryClient'
 
 export const PROJECTS_KEY = ['projects'] as const
@@ -51,6 +51,16 @@ export function useUpdateProjectConfig() {
   return useMutation({
     mutationFn: ({ id, config }: { id: string; config: { autoRestart?: boolean; maxRetries?: number } }) =>
       updateProjectConfig(id, config),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PROJECTS_KEY })
+    },
+  })
+}
+
+export function useCreateProject() {
+  return useMutation({
+    mutationFn: (data: { name: string; path: string; startCommand: string; port?: number; autoRestart?: boolean }) =>
+      createProject(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PROJECTS_KEY })
     },
